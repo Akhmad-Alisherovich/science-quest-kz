@@ -1,0 +1,10 @@
+export interface AdminDashboardStats { totalStudents: number; activeToday: number; activeWeek: number; completedLevels: number; averageXp: number; averageAccuracy: number; challenges: number; grade5: number; grade6: number }
+export interface AdminStudent { userId: string; nickname: string; displayName?: string; avatar: string; grade: number | null; school: string | null; xp: number; rank: number; stars: number; completedLevels: number; averageAccuracy: number; lastActive: string | null; registeredAt: string; totalCount: number; currentLevelId?: string | null; assignedCount?: number; pendingAssignments?: number; needsAttention?: boolean }
+export interface AdminStudentDetail extends AdminStudent { totalLevels: number; currentStreak: number }
+export interface AdminSectionProgress { sectionId: string; completedLevels: number; totalLevels: number; completionPercent: number; stars: number; averageScore: number; mistakes: number }
+export interface AdminLevelHistory { levelId: string; completedAt: string; accuracy: number; stars: number; attemptNumber: number; xpEarned: number; totalCount: number }
+export interface AdminActivity { id: number; userId: string; nickname: string; avatar: string; grade: number | null; eventType: string; levelId: string | null; metadata: Record<string, unknown>; createdAt: string; totalCount: number }
+export interface AdminDailyAnalytics { day: string; activeStudents: number; completedLevels: number; averageAccuracy: number; xpEarned: number }
+export interface AdminWeakTopic { levelId: string; averageScore: number; errorRate: number; attemptCount: number; completionCount: number }
+export interface AdminAchievement { code: string; category: string; rarity: string; title: { kk: string; ru: string }; icon: string; current: number; target: number; unlocked: boolean; earnedAt: string | null; selectedTitle: boolean; totalCount: number; unlockedCount: number }
+export interface AdminAchievementAnalytics { code: string; title: { kk: string; ru: string }; rarity: string; unlockedStudents: number; totalStudents: number; unlockPercent: number }

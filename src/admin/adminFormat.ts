@@ -1,0 +1,1 @@
+export const formatAdminDate = (value: string | null, language: 'kk' | 'ru') => value ? new Intl.DateTimeFormat(language === 'kk' ? 'kk-KZ' : 'ru-RU', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '—'

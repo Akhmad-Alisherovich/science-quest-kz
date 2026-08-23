@@ -1,0 +1,14 @@
+import { useEffect, useMemo, useState } from 'react'
+import { adminCopy } from '../content/admin'
+import { sections } from '../content/sections'
+import { fetchAdminLeaderboard } from '../services/adminService'
+import { useGame } from '../store/GameStore'
+import type { LeaderboardEntry, LeaderboardPeriod } from '../types/leaderboard'
+import { AdminError, AdminLoading } from './AdminDashboard'
+import { AvatarImage } from '../components/AvatarImage'
+
+export function AdminLeaderboard() {
+  const { progress }=useGame(); const copy=adminCopy(progress.language); const [period,setPeriod]=useState<LeaderboardPeriod>('total'); const [section,setSection]=useState(''); const [grade,setGrade]=useState<number|null>(null); const [page,setPage]=useState(0); const [rows,setRows]=useState<LeaderboardEntry[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState(false)
+  const filters=useMemo(()=>({period,section,grade,page}),[period,section,grade,page]); const load=()=>{setLoading(true);setError(false);void fetchAdminLeaderboard(period,section||null,grade,page).then(setRows).catch(()=>setError(true)).finally(()=>setLoading(false))}; useEffect(load,[filters]); const total=rows[0]?.totalCount??0
+  return <><header className="admin-page-heading"><small>TOP 100</small><h1>{copy.leaderboard}</h1></header><section className="admin-filters"><select value={period} onChange={(e)=>{setPeriod(e.target.value as LeaderboardPeriod);setPage(0)}}><option value="total">General</option><option value="week">Weekly</option><option value="month">Monthly</option></select><select value={section} onChange={(e)=>{setSection(e.target.value);setPage(0)}}><option value="">{copy.sections}</option>{sections.map((item)=><option value={item.id} key={item.id}>{item.title[progress.language]}</option>)}</select><select value={grade??''} onChange={(e)=>{setGrade(e.target.value?Number(e.target.value):null);setPage(0)}}><option value="">{copy.allGrades}</option><option value="5">{copy.grade5}</option><option value="6">{copy.grade6}</option></select></section>{loading?<AdminLoading/>:error?<AdminError onRetry={load}/>:rows.length===0?<p className="admin-empty">{copy.noData}</p>:<section className="admin-ranking">{rows.map((row)=><article key={`${row.rank}-${row.nickname}`}><b>{row.rank<=3?['🥇','🥈','🥉'][row.rank-1]:`#${row.rank}`}</b><AvatarImage value={row.avatar} label={row.nickname} /><div><strong>{row.nickname}</strong><small>{row.grade?`${row.grade} ${progress.language==='kk'?'сынып':'класс'}`:'—'}</small></div><strong>{row.xp} XP</strong><span>⭐ {row.stars}</span><span>🔥 {row.challengePoints}</span></article>)}</section>}<nav className="admin-pagination"><button disabled={page===0} onClick={()=>setPage(v=>v-1)}>←</button><span>{page+1}/{Math.max(1,Math.ceil(total/100))}</span><button disabled={(page+1)*100>=total} onClick={()=>setPage(v=>v+1)}>→</button></nav></>
+}

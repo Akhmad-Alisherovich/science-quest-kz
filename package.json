@@ -1,0 +1,47 @@
+{
+  "name": "science-quest-kz",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "check": "tsc -b --pretty false",
+    "check:typography": "node tools/check-kazakh-typography.mjs",
+    "check:typography:dist": "node tools/check-kazakh-typography.mjs --dist",
+    "check:responsive": "node tools/check-responsive.mjs",
+    "check:responsive:dist": "node tools/check-responsive.mjs --dist",
+    "check:leaderboard": "node tools/check-leaderboard.mjs",
+    "check:auth-admin": "node tools/check-auth-admin.mjs",
+    "check:auth-gate": "node tools/check-auth-gate.mjs",
+    "check:registration-contact": "node tools/check-registration-contact.mjs",
+    "check:learning-management": "node tools/check-learning-management.mjs",
+    "check:admin-game-mode": "node tools/check-admin-game-mode.mjs",
+    "check:student-profile-privacy": "node tools/check-student-profile-privacy.mjs",
+    "check:profile-avatars": "node tools/check-profile-avatars.mjs",
+    "check:home-dashboard": "node tools/check-home-dashboard.mjs",
+    "check:achievements": "node tools/check-achievement-system.mjs",
+    "check:music": "node tools/check-background-music.mjs",
+    "check:admin-content-bulk": "node tools/check-admin-content-bulk.mjs",
+    "check:supabase": "node tools/check-supabase-connection.mjs",
+    "test:leaderboard:integration": "node tools/test-leaderboard-integration.mjs",
+    "test:auth-admin:integration": "node tools/test-auth-admin-integration.mjs",
+    "test:auth-linking:integration": "node tools/test-auth-linking-integration.mjs",
+    "test:guest-security": "node tools/test-guest-security.mjs",
+    "test:registration-contact:integration": "node tools/test-registration-contact-integration.mjs",
+    "test:profile-avatars:integration": "node tools/test-profile-avatars-integration.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
+    "@vitejs/plugin-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}

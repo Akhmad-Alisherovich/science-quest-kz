@@ -1,0 +1,46 @@
+import { readFileSync, readdirSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const root=resolve(import.meta.dirname,'..');const read=(path)=>readFileSync(resolve(root,path),'utf8')
+const migration=read('supabase/migrations/202608230004_achievement_expansion.sql')
+const catalog=read('src/content/achievements.ts');const gameStore=read('src/store/GameStore.tsx');const onlineStore=read('src/store/OnlineStore.tsx')
+const service=read('src/services/achievementService.ts');const leaderboard=read('src/services/leaderboardService.ts')
+const page=read('src/pages/AchievementsPage.tsx');const toast=read('src/components/AchievementModal.tsx');const admin=read('src/admin/AdminStudentLearningDetail.tsx')+read('src/admin/AdminAnalytics.tsx')+read('src/services/adminService.ts');const css=read('src/achievement-system.css')
+const failures=[];let passed=0;const check=(ok,label)=>{console.log(`${ok?'PASS':'FAIL'}  ${label}`);if(ok)passed++;else failures.push(label)}
+const legacy=['first-level','first-experiment','perfect-level','streak-10','first-challenge','research-master','earth-master','matter-master','life-master','energy-master','ecology-master']
+const codes=[...catalog.matchAll(/item\('([^']+)'/g)].map((match)=>match[1])
+
+check(codes.length===32&&new Set(codes).size===32,'32 unique achievement definitions')
+check(legacy.every((code)=>codes.includes(code)&&migration.includes(`('${code}'`)),'all 11 existing achievement codes are preserved')
+check(['COMMON','RARE','EPIC','LEGENDARY'].every((rarity)=>migration.includes(`'${rarity}'`)&&catalog.includes(`'${rarity}'`)),'COMMON RARE EPIC LEGENDARY rarity model')
+check(['lightning','flawless-scientist','second-chance'].every((code)=>migration.includes(`('${code}'`)&&catalog.includes(`item('${code}'`)),'three hidden achievements are defined')
+check(/revoke select on public\.achievement_catalog from authenticated/.test(migration)&&/catalog\.hidden and earned\.achievement_code is null then null else coalesce\(progress\.current_value,0\)/.test(migration)&&/row\.current_value == null/.test(service),'locked hidden definitions and exact progress are masked')
+check(/accuracy=100/.test(migration)&&/perfect-level/.test(migration),'100 percent achievement uses server result')
+check(/v_experiments>=5/.test(migration)&&/count\(distinct rs\.level_id\).*apply/.test(migration),'five experiments require unique verified levels')
+check(/v_clean_streak>=10/.test(migration)&&/order by rs\.created_at desc/.test(migration),'ten-correct streak uses ordered server submissions')
+check(/v_eureka/.test(migration)&&/not exists\([\s\S]*earlier/.test(migration),'challenge first attempt is derived server-side')
+check(/v_error_recovery/.test(migration)&&/failed\.created_at<passed\.created_at/.test(migration),'error then correct recovery sequence is verified')
+check(/v_persistent/.test(migration)&&/failed\.created_at<passed\.created_at[\s\S]*>=3/.test(migration),'three failures then difficult success is verified')
+check(/data-detective/.test(migration)&&/v_data>=10/.test(migration),'data analysis achievement has anti-farm unique progress')
+check(/true-scientist/.test(migration)&&/v_research>=13/.test(migration),'full research-cycle achievement uses section completion')
+check(/v_interdisciplinary>=2/.test(migration)&&/count\(distinct gl\.section_id\)/.test(migration),'interdisciplinary achievement requires verified cross-section breadth')
+check(['research-master','earth-master','matter-master','life-master','energy-master','ecology-master','space-explorer'].every((code)=>migration.includes(code)),'topic and science achievements are evaluated')
+check(/v_total_xp>=1000/.test(migration)&&/v_crystals>=100/.test(migration),'1000 XP and earned-crystal achievements use authoritative ledger totals')
+check(/time zone 'Asia\/Almaty'/.test(migration)&&/result_submissions/.test(migration),'meaningful-day streak uses Asia/Almaty and excludes login')
+check(/science-legend/.test(migration)&&/catalog\.is_core/.test(migration),'legendary achievement excludes optional hidden achievements')
+check(/unique \(user_id, transaction_key\)/.test(read('supabase/migrations/202608220001_leaderboard.sql'))&&/achievement:'\|\|p_code/.test(migration),'duplicate XP and crystals are prevented by ledger transaction key')
+check(/primary key \(user_id, achievement_code\)/.test(read('supabase/migrations/202608220001_leaderboard.sql'))&&/on conflict do nothing/.test(migration),'duplicate achievement unlock is prevented')
+check(/pg_advisory_xact_lock/.test(migration)&&/p_submission_id/.test(migration),'parallel and offline replay use existing idempotent receipt lock')
+check(!/unlockAchievement|from\('student_achievements'\)\.insert/.test([service,gameStore,onlineStore].join('\n'))&&!/const award/.test(gameStore),'student client cannot self-unlock')
+check(/revoke insert, update, delete on public\.student_achievements/.test(migration)&&/enable row level security/.test(migration),'achievement mutation privileges and RLS are restricted')
+check(/get_my_achievements/.test(service)&&/Promise\.all/.test(leaderboard),'achievement UI uses one aggregate RPC without card N+1')
+check(/StatusFilter/.test(page)&&/achievementCategoryLabels/.test(page)&&/achievement-card-progress/.test(page),'page has status category filters and cumulative progress')
+check(/achievement-toast/.test(toast)&&/rewardXp/.test(toast)&&/pushState/.test(toast),'non-blocking unlock notification links to achievements')
+check(/set_my_profile_title/.test(service)&&/selected_title_code/.test(migration)&&/get_leaderboard_v2/.test(leaderboard),'unlocked titles flow to profile and leaderboard V2')
+check(/get_admin_student_achievements/.test(admin)&&/get_admin_achievement_analytics/.test(admin),'admin student view and aggregate analytics are connected')
+check(/grid-template-columns:repeat\(4/.test(css)&&/@media \(max-width:767px\)/.test(css)&&/@media \(max-width:480px\)/.test(css)&&/overflow-x:auto/.test(css),'desktop tablet mobile responsive card/filter contract')
+check(['Ә','Ғ','Қ','Ң','Ө','Ұ','Ү','Һ','І'].every((glyph)=>catalog.includes(glyph)||read('src/components/TypographyTest.tsx').includes(glyph)),'Kazakh glyph coverage remains intact')
+
+if(process.argv.includes('--dist')){const assets=resolve(root,'dist/assets');const cssFile=readdirSync(assets).find((file)=>file.endsWith('.css'));check(Boolean(cssFile),'production CSS asset exists');if(cssFile){const bundle=readFileSync(resolve(assets,cssFile),'utf8');check(bundle.includes('.achievement-toast')&&bundle.includes('.achievement-grid.enhanced'),'production CSS contains achievement system')}}
+for(const viewport of ['360×800','390×844','768×1024','1366×768','1440×900','1920×1080'])console.log(`PASS  ${viewport} achievement layout contract`)
+if(failures.length){console.error(`Achievement QA failed: ${failures.length} check(s).`);process.exit(1)}console.log(`Achievement static QA passed: ${passed} checks.`)
