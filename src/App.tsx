@@ -28,7 +28,7 @@ const AuthPage = lazy(() => import('./auth/AuthPage').then((module) => ({ defaul
 const ProfileSetupPage = lazy(() => import('./auth/ProfileSetupPage').then((module) => ({ default: module.ProfileSetupPage })))
 const AdminApp = lazy(() => import('./admin/AdminApp').then((module) => ({ default: module.AdminApp })))
 
-const PUBLIC_PATHS = new Set(['/', '/login', '/register', '/forgot-password', '/verify'])
+const PUBLIC_PATHS = new Set(['/', '/login', '/register', '/forgot-password'])
 
 export function App() {
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('typography-test')) {
@@ -79,12 +79,25 @@ function AppRouter() {
       if (!PUBLIC_PATHS.has(path)) navigate('/', true)
       return
     }
-    if (auth.roleLoading || auth.needsPasswordSetup || linkAccount) return
+    if (auth.roleLoading || auth.needsPasswordSetup) return
+    if (linkAccount && !auth.isAnonymous) {
+      setLinkAccount(false)
+      return
+    }
+    if (linkAccount) return
     if (auth.role === 'admin' && PUBLIC_PATHS.has(path)) {
       navigate('/admin', true)
       return
     }
-    if (auth.role === 'student' && status === 'ready' && profile && PUBLIC_PATHS.has(path)) navigate('/game', true)
+    if (auth.role === 'admin' && path === '/profile/setup') {
+      navigate('/admin', true)
+      return
+    }
+    if (auth.role === 'student' && status === 'ready' && !profile && path !== '/profile/setup') {
+      navigate('/profile/setup', true)
+      return
+    }
+    if (auth.role === 'student' && status === 'ready' && profile && (PUBLIC_PATHS.has(path) || path === '/profile/setup')) navigate('/game', true)
   // Navigation follows authentication transitions; navigate is intentionally local.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.phase, auth.user?.id, auth.role, auth.roleLoading, auth.needsPasswordSetup, linkAccount, status, profile, path])
@@ -96,7 +109,7 @@ function AppRouter() {
   if (!auth.user || auth.phase === 'guest' || auth.phase === 'error') {
     const publicPath = PUBLIC_PATHS.has(path) ? path : '/'
     if (publicPath === '/') return <PublicLandingPage onLogin={() => navigate('/login')} onRegister={() => navigate('/register')} />
-    const initialView: AuthView = publicPath === '/register' ? 'register' : publicPath === '/forgot-password' ? 'forgot' : publicPath === '/verify' ? 'verify' : 'login'
+    const initialView: AuthView = publicPath === '/register' ? 'register' : publicPath === '/forgot-password' ? 'forgot' : 'login'
     return <AuthPage initialView={initialView} onBack={() => navigate('/')} />
   }
 

@@ -95,7 +95,7 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
     diagnostics,
     connect,
     saveProfile: async (input) => {
-      const savedPhone = await saveMyPrivateContact(input.phone)
+      const savedPhone = input.phone ? await saveMyPrivateContact(input.phone) : phone
       const saved = await saveOnlineProfile(input)
       setPhone(savedPhone)
       setProfile(saved)

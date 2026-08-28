@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import type { AppRole, AuthActionResult } from '../types/auth'
+import type { AppRole } from '../types/auth'
 import { normalizePhone, saveMyPrivateContact } from './privateContactService'
 
 const requireClient = () => {
@@ -13,27 +13,32 @@ export async function getMyRole(): Promise<AppRole> {
   return data === 'admin' ? 'admin' : 'student'
 }
 
-export async function registerWithEmail(email: string, password: string, phone: string, isAnonymous: boolean): Promise<AuthActionResult> {
+export async function registerWithEmail(email: string, password: string, phone: string, isAnonymous: boolean): Promise<void> {
   const client = requireClient()
   const normalizedPhone = normalizePhone(phone)
   if (isAnonymous) {
-    await saveMyPrivateContact(normalizedPhone)
-    const { data, error } = await client.auth.updateUser({ email: email.trim() })
+    const { data, error } = await client.auth.updateUser({ email: email.trim(), password })
     if (error) throw error
-    if (!data.user.is_anonymous) {
-      const passwordResult = await client.auth.updateUser({ password })
-      if (passwordResult.error) throw passwordResult.error
-      return {}
-    }
-    return { confirmationRequired: true }
+    const { data: sessionData, error: sessionError } = await client.auth.getSession()
+    if (sessionError) throw sessionError
+    if (data.user.is_anonymous || !sessionData.session) throw new Error('REGISTRATION_SESSION_MISSING')
+    await saveMyPrivateContact(normalizedPhone)
+    return
   }
   const { data, error } = await client.auth.signUp({
     email: email.trim(),
     password,
-    options: { emailRedirectTo: window.location.origin, data: { registration_phone: normalizedPhone } },
+    options: { data: { registration_phone: normalizedPhone } },
   })
+  if (import.meta.env.DEV) {
+    console.log('SIGNUP ERROR', error)
+    console.log('SIGNUP USER', data?.user)
+    console.log('SIGNUP SESSION', data?.session)
+  }
   if (error) throw error
-  return { confirmationRequired: !data.session }
+  if (data.user && !data.session) throw new Error('REGISTRATION_SESSION_MISSING')
+  if (!data.session) throw new Error('SIGNUP_RESPONSE_INCOMPLETE')
+  await saveMyPrivateContact(normalizedPhone)
 }
 
 export async function loginWithEmail(email: string, password: string) {
@@ -48,11 +53,6 @@ export async function sendPasswordRecovery(email: string) {
 
 export async function updatePassword(password: string) {
   const { error } = await requireClient().auth.updateUser({ password })
-  if (error) throw error
-}
-
-export async function resendEmail(email: string, emailChange = false) {
-  const { error } = await requireClient().auth.resend({ type: emailChange ? 'email_change' : 'signup', email: email.trim(), options: { emailRedirectTo: window.location.origin } })
   if (error) throw error
 }
 

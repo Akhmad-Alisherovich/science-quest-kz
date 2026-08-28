@@ -1,19 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { isLeaderboardConfigured, supabase } from '../lib/supabase'
-import { getMyRole, logLogin, loginWithEmail, registerWithEmail, resendEmail, sendPasswordRecovery, signOut, updatePassword } from '../services/authService'
-import { isValidPhone, normalizePhone, saveMyPrivateContact } from '../services/privateContactService'
-import type { AuthActionResult, AuthContextState } from '../types/auth'
+import { getMyRole, logLogin, loginWithEmail, registerWithEmail, sendPasswordRecovery, signOut, updatePassword } from '../services/authService'
+import { isValidPhone, normalizePhone } from '../services/privateContactService'
+import type { AuthContextState } from '../types/auth'
 
 const PASSWORD_SETUP_KEY = 'science-quest-kz-password-setup-v1'
-const PENDING_EMAIL_KEY = 'science-quest-kz-pending-email-v1'
-const PENDING_PHONE_KEY = 'science-quest-kz-pending-registration-phone-v1'
 
 interface AuthContextValue extends AuthContextState {
-  registerEmail: (email: string, password: string, phone: string) => Promise<AuthActionResult>
+  registerEmail: (email: string, password: string, phone: string) => Promise<void>
   loginEmail: (email: string, password: string) => Promise<void>
   recoverEmail: (email: string) => Promise<void>
-  resendConfirmation: (email: string) => Promise<void>
   finishPasswordSetup: (password: string) => Promise<void>
   logout: () => Promise<void>
   refreshRole: () => Promise<void>
@@ -27,16 +24,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AuthContextState['role']>('student')
   const [roleLoading, setRoleLoading] = useState(false)
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(() => sessionStorage.getItem(PASSWORD_SETUP_KEY) === 'true')
-
-  const syncPendingPhone = useCallback(async (activeSession: Session | null) => {
-    const pendingPhone = sessionStorage.getItem(PENDING_PHONE_KEY)
-    const pendingEmail = sessionStorage.getItem(PENDING_EMAIL_KEY)?.trim().toLowerCase()
-    const sessionEmail = activeSession?.user.email?.trim().toLowerCase()
-    if (!activeSession || !pendingPhone || !pendingEmail || pendingEmail !== sessionEmail || !isValidPhone(pendingPhone)) return
-    await saveMyPrivateContact(pendingPhone)
-    sessionStorage.removeItem(PENDING_PHONE_KEY)
-    sessionStorage.removeItem(PENDING_EMAIL_KEY)
-  }, [])
 
   const loadRole = useCallback(async (activeSession: Session | null) => {
     if (!activeSession) { setRole('student'); setRoleLoading(false); return }
@@ -55,7 +42,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session)
       setPhase(data.session ? 'authenticated' : 'guest')
       void loadRole(data.session)
-      if (data.session) void syncPendingPhone(data.session).catch(() => undefined)
       if (data.session) void logLogin().catch(() => undefined)
     })
     const { data } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, nextSession) => {
@@ -63,15 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(nextSession)
       setPhase(nextSession ? 'authenticated' : 'guest')
       window.setTimeout(() => {
-        if (nextSession) void syncPendingPhone(nextSession).catch(() => undefined)
-        if (nextSession?.user && !nextSession.user.is_anonymous && !sessionStorage.getItem(PENDING_PHONE_KEY)) sessionStorage.removeItem(PENDING_EMAIL_KEY)
         void loadRole(nextSession)
         if (nextSession && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) void logLogin().catch(() => undefined)
         if (event === 'PASSWORD_RECOVERY') { sessionStorage.setItem(PASSWORD_SETUP_KEY, 'true'); setNeedsPasswordSetup(true) }
       }, 0)
     })
     return () => { active = false; data.subscription.unsubscribe() }
-  }, [loadRole, syncPendingPhone])
+  }, [loadRole])
 
   const isAnonymous = Boolean(session?.user.is_anonymous)
   const value = useMemo<AuthContextValue>(() => ({
@@ -85,33 +69,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     registerEmail: async (email, password, phone) => {
       const normalizedPhone = normalizePhone(phone)
       if (!isValidPhone(normalizedPhone)) throw new Error('PHONE_INVALID')
-      sessionStorage.setItem(PENDING_EMAIL_KEY, email.trim())
-      sessionStorage.setItem(PENDING_PHONE_KEY, normalizedPhone)
-      try {
-        const result = await registerWithEmail(email, password, normalizedPhone, isAnonymous)
-        if (!result.confirmationRequired) await syncPendingPhone((await supabase?.auth.getSession())?.data.session ?? null)
-        if (isAnonymous && result.confirmationRequired) { sessionStorage.setItem(PASSWORD_SETUP_KEY, 'true'); setNeedsPasswordSetup(true) }
-        return result
-      } catch (error) {
-        sessionStorage.removeItem(PENDING_EMAIL_KEY)
-        sessionStorage.removeItem(PENDING_PHONE_KEY)
-        throw error
-      }
+      await registerWithEmail(email, password, normalizedPhone, isAnonymous)
     },
     loginEmail: loginWithEmail,
     recoverEmail: sendPasswordRecovery,
-    resendConfirmation: (email) => resendEmail(email, isAnonymous),
     finishPasswordSetup: async (password) => { await updatePassword(password); sessionStorage.removeItem(PASSWORD_SETUP_KEY); setNeedsPasswordSetup(false) },
     logout: async () => {
       await signOut()
       sessionStorage.removeItem(PASSWORD_SETUP_KEY)
-      sessionStorage.removeItem(PENDING_EMAIL_KEY)
-      sessionStorage.removeItem(PENDING_PHONE_KEY)
       setNeedsPasswordSetup(false)
       setRole('student')
     },
     refreshRole: () => loadRole(session),
-  }), [phase, session, role, roleLoading, isAnonymous, needsPasswordSetup, loadRole, syncPendingPhone])
+  }), [phase, session, role, roleLoading, isAnonymous, needsPasswordSetup, loadRole])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

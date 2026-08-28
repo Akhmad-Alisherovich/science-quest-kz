@@ -12,7 +12,3 @@ export interface AuthContextState {
   isAnonymous: boolean
   needsPasswordSetup: boolean
 }
-
-export interface AuthActionResult {
-  confirmationRequired?: boolean
-}

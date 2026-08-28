@@ -27,7 +27,7 @@ export interface OnlineProfileInput {
   avatar: ScienceAvatar
   avatarPath: string | null
   showGrade: boolean
-  phone: string
+  phone?: string
 }
 
 export interface LeaderboardEntry {

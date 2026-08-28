@@ -9,7 +9,7 @@ import { formatPhone, isValidPhone, normalizePhone } from '../services/privateCo
 import { AvatarUploader } from './AvatarUploader'
 import { AvatarImage } from './AvatarImage'
 
-export function OnlineProfileForm({ onSaved }: { onSaved?: () => void }) {
+export function OnlineProfileForm({ onSaved, mode = 'edit' }: { onSaved?: () => void; mode?: 'setup' | 'edit' }) {
   const { progress } = useGame()
   const { profile, phone: savedPhone, saveProfile } = useOnline()
   const copy = ui(progress.language)
@@ -39,11 +39,11 @@ export function OnlineProfileForm({ onSaved }: { onSaved?: () => void }) {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (!validateNickname(nickname)) { setMessage(copy.nicknameInvalid); return }
-    if (!phone.trim()) { setMessage(contactCopy.phoneRequired); return }
-    if (!isValidPhone(phone)) { setMessage(contactCopy.invalidPhone); return }
+    if (mode === 'edit' && !phone.trim()) { setMessage(contactCopy.phoneRequired); return }
+    if (mode === 'edit' && !isValidPhone(phone)) { setMessage(contactCopy.invalidPhone); return }
     setSaving(true); setMessage('')
     try {
-      await saveProfile({ nickname, displayName: displayName.trim() || progress.name, grade: grade ? Number(grade) : null, school: school || null, avatar, avatarPath, showGrade, phone: normalizePhone(phone) })
+      await saveProfile({ nickname, displayName: displayName.trim() || progress.name, grade: grade ? Number(grade) : null, school: school || null, avatar, avatarPath, showGrade, phone: phone.trim() ? normalizePhone(phone) : undefined })
       setMessage(copy.profileSaved)
       onSaved?.()
     } catch (error) {
@@ -55,14 +55,14 @@ export function OnlineProfileForm({ onSaved }: { onSaved?: () => void }) {
   return <form className="online-profile-form" onSubmit={submit}>
     <div className="profile-form-heading"><span>🌐</span><div><h2>{copy.onlineProfile}</h2><p>{copy.leaderboardPrivacy}</p></div></div>
     <label>{copy.nickname}<input value={nickname} minLength={3} maxLength={20} required autoComplete="off" spellCheck={false} onChange={(event) => setNickname(event.target.value)} aria-invalid={nickname.length > 0 && !validateNickname(nickname)} /></label>
-    <label>{copy.displayName}<input value={displayName} maxLength={40} onChange={(event) => setDisplayName(event.target.value)} /></label>
-    <label>{contactCopy.phone}<input type="tel" inputMode="tel" autoComplete="tel" placeholder="+7 700 123 45 67" value={phone} required onChange={(event) => setPhone(event.target.value)} /><small>{contactCopy.phoneHint}</small></label>
+    {mode === 'edit' && <label>{copy.displayName}<input value={displayName} maxLength={40} onChange={(event) => setDisplayName(event.target.value)} /></label>}
+    {mode === 'edit' && <label>{contactCopy.phone}<input type="tel" inputMode="tel" autoComplete="tel" placeholder="+7 700 123 45 67" value={phone} required onChange={(event) => setPhone(event.target.value)} /><small>{contactCopy.phoneHint}</small></label>}
     <fieldset className="avatar-picker avatar-picker-extended"><legend>{copy.avatar}</legend><div className="avatar-current-preview"><AvatarImage value={avatarPath ? `${avatarPath}?v=${avatarRevision}` : avatar} label={progress.language === 'kk' ? 'Таңдалған аватар' : 'Выбранный аватар'} /><span>{avatarPath ? (progress.language === 'kk' ? 'Жеке фотосурет' : 'Личная фотография') : (progress.language === 'kk' ? 'Ғылыми аватар' : 'Научный аватар')}</span></div><div className="science-avatar-options">{scienceAvatars.map((item) => <button type="button" key={item} className={!avatarPath && avatar === item ? 'selected' : ''} onClick={() => { setAvatar(item); setAvatarPath(null) }} aria-pressed={!avatarPath && avatar === item}>{item}</button>)}</div><AvatarUploader onUploaded={(path) => { setAvatarPath(path); setAvatarRevision(Date.now()); setMessage('') }} /></fieldset>
     <div className="profile-form-row">
       <label>{copy.grade}<select value={grade} required onChange={(event) => setGrade(event.target.value)}><option value="">—</option>{[5, 6].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
       <label>{copy.schoolOptional}<input value={school} maxLength={120} onChange={(event) => setSchool(event.target.value)} /></label>
     </div>
-    <label className="profile-checkbox"><input type="checkbox" checked={showGrade} onChange={(event) => setShowGrade(event.target.checked)} />{copy.showGrade}</label>
+    {mode === 'edit' && <label className="profile-checkbox"><input type="checkbox" checked={showGrade} onChange={(event) => setShowGrade(event.target.checked)} />{copy.showGrade}</label>}
     {message && <p className={message === copy.profileSaved ? 'form-message success' : 'form-message'} role="status">{message}</p>}
     <button className="primary-button" disabled={saving} type="submit">{saving ? '…' : profile ? copy.updateProfile : copy.createProfile}</button>
   </form>

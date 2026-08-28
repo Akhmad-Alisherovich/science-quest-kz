@@ -24,7 +24,7 @@ const checks = [
   ['activity payload is allow-listed', /p_event_type not in \('LOGIN','LEVEL_STARTED'\)/.test(migration) && !/(email|phone|password|token)'\s*,\s*new\./i.test(migration)],
   ['official Supabase email auth', /auth\.signUp/.test(authService) && /auth\.signInWithPassword/.test(authService) && /resetPasswordForEmail/.test(authService)],
   ['phone OTP auth is removed', !/auth\.signInWithOtp|auth\.verifyOtp|sendPhoneOtp|verifyPhoneOtp/.test(authService)],
-  ['anonymous linking uses email update and private contact storage', /isAnonymous[\s\S]*?saveMyPrivateContact[\s\S]*?auth\.updateUser\(\{ email/.test(authService)],
+  ['anonymous linking uses email/password update and private contact storage', /isAnonymous[\s\S]*?auth\.updateUser\(\{ email[\s\S]*?saveMyPrivateContact/.test(authService)],
   ['passwords and tokens are not persisted', !/(localStorage|sessionStorage)\.setItem\([^,\n]+,\s*(password|otp|token|session\.|.*access_token|.*refresh_token)/i.test(source)],
   ['protected admin route is wired', /path\.startsWith\('\/admin'\)/.test(app) && /role !== 'admin'/.test(adminRoute)],
   ['offline results are scoped to user UUID', /type QueuedCompetitiveResult[^\n]*ownerId/.test(leaderboardService) && /queued\.ownerId === user\.id/.test(leaderboardService)],

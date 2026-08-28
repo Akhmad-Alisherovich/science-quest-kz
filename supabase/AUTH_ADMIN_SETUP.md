@@ -15,9 +15,13 @@ leaderboard RPC не получают поле телефона.
 
 ## 2. Настройки Auth
 
-В Authentication → Providers оставьте включённым Email. В URL Configuration укажите URL
-приложения в Site URL и Redirect URLs — ссылки подтверждения и восстановления возвращаются
-на `window.location.origin`.
+В Authentication → Sign In / Providers → Email оставьте включённым Email и выключите
+**Confirm email**. Регистрация должна сразу возвращать authenticated session; frontend не
+показывает экран ожидания подтверждения и не отправляет signup email повторно.
+
+В URL Configuration укажите URL приложения в Site URL и Redirect URLs. Эти настройки
+по-прежнему нужны для ссылки восстановления пароля, которая возвращается на
+`window.location.origin`. Для этого изменения новая SQL migration не требуется.
 
 Для сохранения anonymous-прогресса при регистрации включите в Authentication settings
 ручное связывание identities (manual identity linking). Клиент использует официальный
@@ -29,8 +33,8 @@ SCIENCE QUEST использует только Email + Password. SMS provider �
 
 ## 3. Назначение первого администратора
 
-Сначала зарегистрируйте будущего администратора через обычную страницу входа и подтвердите
-email. Затем скопируйте UUID этого пользователя из Authentication → Users и один раз выполните
+Сначала зарегистрируйте будущего администратора через обычную страницу регистрации. Затем
+скопируйте UUID этого пользователя из Authentication → Users и один раз выполните
 в SQL Editor, заменив значение-заглушку на реальный UUID:
 
 ```sql

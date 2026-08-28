@@ -15,7 +15,7 @@ const migration2 = read('supabase/migrations/202608220002_auth_admin.sql')
 const appRuntime = [app, authStore, onlineStore, leaderboardService].join('\n')
 
 const checks = [
-  ['public and private paths are explicit', /PUBLIC_PATHS[\s\S]*?'\/login'[\s\S]*?'\/register'[\s\S]*?'\/forgot-password'[\s\S]*?'\/verify'/.test(app) && /'\/profile'/.test(app) && /'\/leaderboard'/.test(app) && /'\/achievements'/.test(app)],
+  ['public and private paths are explicit', /PUBLIC_PATHS[\s\S]*?'\/login'[\s\S]*?'\/register'[\s\S]*?'\/forgot-password'/.test(app) && !/'\/verify'/.test(app) && /'\/profile'/.test(app) && /'\/leaderboard'/.test(app) && /'\/achievements'/.test(app)],
   ['session loading splash prevents guest flash', /auth\.phase === 'loading'[\s\S]*?return <AppLoading \/>/.test(app) && /function AppLoading\(\)[\s\S]*?className="app-loading"/.test(app)],
   ['guest branch renders the dedicated public landing', /!auth\.user[\s\S]*?PublicLandingPage/.test(app)],
   ['guest private URL is replaced with root', /!PUBLIC_PATHS\.has\(path\)[\s\S]*?navigate\('\/', true\)/.test(app)],
@@ -27,7 +27,7 @@ const checks = [
   ['online store exits before private fetches without a session', /if \(!session\) \{[\s\S]*?setStatus\('unauthenticated'\)[\s\S]*?return[\s\S]*?setStatus\('connecting'\)/.test(onlineStore)],
   ['logout removes private in-memory account state', /deactivateAccount/.test(gameStore) && /setProfile\(null\)[\s\S]*?setRankMovement\(0\)[\s\S]*?deactivateAccount\(\)/.test(onlineStore)],
   ['admin access uses server role state', /auth\.role === 'admin'/.test(app) && /getMyRole/.test(authStore)],
-  ['student profile setup guard remains active', /status === 'ready' && !profile[\s\S]*?ProfileSetupPage/.test(app)],
+  ['student profile setup guard remains active', /status === 'ready' && !profile[\s\S]*?navigate\('\/profile\/setup'/.test(app) && /status === 'ready' && !profile[\s\S]*?ProfileSetupPage/.test(app)],
   ['leaderboard tables are denied to anon', /revoke all on public\.profiles[\s\S]*?from anon, authenticated/.test(migration1)],
   ['leaderboard RPC is denied to anon', /revoke all on function public\.get_leaderboard[\s\S]*?from public, anon/.test(migration1)],
   ['admin data and RPCs are denied to anon', /revoke all on public\.user_roles, public\.student_activity from anon, authenticated/.test(migration2) && /revoke all on function public\.get_admin_dashboard\(\) from public, anon/.test(migration2)],

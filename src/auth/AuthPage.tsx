@@ -5,32 +5,22 @@ import { useAuth } from '../store/AuthStore'
 import { useGame } from '../store/GameStore'
 
 type AuthTab = 'login' | 'register'
-export type AuthView = AuthTab | 'forgot' | 'verify'
-const PENDING_EMAIL_KEY = 'science-quest-kz-pending-email-v1'
-const PENDING_PHONE_KEY = 'science-quest-kz-pending-registration-phone-v1'
+export type AuthView = AuthTab | 'forgot'
 
 export function AuthPage({ onBack, initialView = 'login' }: { onBack?: () => void; initialView?: AuthView }) {
   const { progress } = useGame()
   const auth = useAuth()
   const copy = authCopy(progress.language)
   const [tab, setTab] = useState<AuthTab>(initialView === 'register' ? 'register' : 'login')
-  const [email, setEmail] = useState(() => sessionStorage.getItem(PENDING_EMAIL_KEY) ?? '')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [repeat, setRepeat] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [phone, setPhone] = useState(() => sessionStorage.getItem(PENDING_PHONE_KEY) ?? '')
-  const [cooldown, setCooldown] = useState(0)
-  const [emailConfirmation, setEmailConfirmation] = useState(() => Boolean(sessionStorage.getItem(PENDING_EMAIL_KEY)))
+  const [phone, setPhone] = useState('')
   const [recovery, setRecovery] = useState(initialView === 'forgot')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (cooldown <= 0) return
-    const timer = window.setInterval(() => setCooldown((value) => Math.max(0, value - 1)), 1000)
-    return () => window.clearInterval(timer)
-  }, [cooldown])
 
   useEffect(() => {
     setTab(initialView === 'register' ? 'register' : 'login')
@@ -38,8 +28,28 @@ export function AuthPage({ onBack, initialView = 'login' }: { onBack?: () => voi
   }, [initialView])
 
   const fail = (reason?: unknown) => {
-    const value = reason instanceof Error ? reason.message.toLowerCase() : ''
-    setError(value.includes('invalid login') ? copy.invalidCredentials : value.includes('already registered') || value.includes('already exists') ? copy.alreadyRegistered : value.includes('rate limit') || value.includes('too many') ? copy.rateLimited : value.includes('phone_invalid') ? copy.invalidPhone : copy.genericError)
+    const details = typeof reason === 'object' && reason !== null ? reason as { message?: unknown; code?: unknown } : null
+    const rawMessage = typeof details?.message === 'string' ? details.message : ''
+    const rawCode = typeof details?.code === 'string' ? details.code : ''
+    const value = rawMessage.toLowerCase()
+    if (value.includes('registration_session_missing')) {
+      setError(copy.signupSessionMissing)
+      return
+    }
+    if (tab === 'register' && !recovery && rawMessage) {
+      setError(rawCode ? `${rawMessage} (${rawCode})` : rawMessage)
+      return
+    }
+    setError(
+      value.includes('invalid login') ? copy.invalidCredentials
+        : value.includes('already registered') || value.includes('already exists') || value.includes('user_already_registered') ? copy.alreadyRegistered
+          : value.includes('invalid email') ? copy.invalidEmail
+            : value.includes('weak password') || value.includes('password should') || value.includes('password is too') ? copy.weakPassword
+              : value.includes('rate limit') || value.includes('too many') ? copy.rateLimited
+                : value.includes('failed to fetch') || value.includes('network') || value.includes('load failed') ? copy.networkError
+                  : value.includes('phone_invalid') ? copy.invalidPhone
+                    : copy.genericError,
+    )
   }
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
@@ -58,10 +68,7 @@ export function AuthPage({ onBack, initialView = 'login' }: { onBack?: () => voi
     setBusy(true)
     try {
       if (tab === 'login') await auth.loginEmail(email, password)
-      else {
-        const result = await auth.registerEmail(email, password, phone)
-        if (result.confirmationRequired) { sessionStorage.setItem(PENDING_EMAIL_KEY, email.trim()); setEmailConfirmation(true); setCooldown(60) }
-      }
+      else await auth.registerEmail(email, password, phone)
     } catch (reason) { fail(reason) } finally { setBusy(false) }
   }
 
@@ -70,15 +77,11 @@ export function AuthPage({ onBack, initialView = 'login' }: { onBack?: () => voi
     if (password.length < 8) { setError(copy.passwordShort); return }
     if (password !== repeat) { setError(copy.passwordMismatch); return }
     setBusy(true)
-    try { await auth.finishPasswordSetup(password); sessionStorage.removeItem(PENDING_EMAIL_KEY) } catch (reason) { fail(reason) } finally { setBusy(false) }
+    try { await auth.finishPasswordSetup(password) } catch (reason) { fail(reason) } finally { setBusy(false) }
   }
 
   if (auth.needsPasswordSetup && auth.user && !auth.isAnonymous) return <AuthShell onBack={onBack}>
     <form className="auth-form" onSubmit={saveNewPassword}><h2>{copy.setPassword}</h2><p>{copy.setPasswordHelp}</p><PasswordFields copy={copy} password={password} repeat={repeat} show={showPassword} setPassword={setPassword} setRepeat={setRepeat} setShow={setShowPassword} />{error && <p className="auth-error" role="alert">{error}</p>}<button className="primary-button" disabled={busy}>{busy ? '…' : copy.savePassword}</button></form>
-  </AuthShell>
-
-  if (emailConfirmation) return <AuthShell onBack={onBack}>
-    <section className="auth-message-card"><span>✉️</span><h2>{copy.verifyEmail}</h2><p>{copy.verifyEmailHelp}</p><button className="secondary-button" disabled={busy || cooldown > 0} onClick={() => { setBusy(true); void auth.resendConfirmation(email).then(() => { setMessage(copy.emailResent); setCooldown(60) }).catch(fail).finally(() => setBusy(false)) }}>{cooldown > 0 ? `${copy.resendEmail} · ${cooldown}` : copy.resendEmail}</button><button className="auth-text-button" onClick={() => { sessionStorage.removeItem(PENDING_EMAIL_KEY); sessionStorage.removeItem(PENDING_PHONE_KEY); setEmailConfirmation(false); setTab('login') }}>{copy.anotherAccount}</button>{message && <p className="auth-success">{message}</p>}</section>
   </AuthShell>
 
   return <AuthShell onBack={onBack}>
